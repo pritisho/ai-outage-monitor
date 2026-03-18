@@ -1,0 +1,92 @@
+[
+  {
+    "provider": "OpenAI",
+    "name": "User Requests Timing Out / Content Not Loading",
+    "status": "investigating",
+    "created_at": "2026-03-18T15:46:44Z",
+    "updated_at": "2026-03-18T16:41:03Z",
+    "resolved_at": "",
+    "impact": "major"
+  },
+  {
+    "provider": "OpenAI",
+    "name": "Excel Plugin is inaccessible for some users",
+    "status": "resolved",
+    "created_at": "2026-03-17T17:26:24Z",
+    "updated_at": "2026-03-17T18:50:07Z",
+    "resolved_at": "2026-03-17T18:50:07Z",
+    "impact": "minor"
+  },
+  {
+    "provider": "OpenAI",
+    "name": "High Error rates with ChatGPT 5.4 Pro",
+    "status": "resolved",
+    "created_at": "2026-03-17T18:16:48Z",
+    "updated_at": "2026-03-17T18:40:05Z",
+    "resolved_at": "2026-03-17T18:40:04Z",
+    "impact": "major"
+  },
+  {
+    "provider": "OpenAI",
+    "name": "Elevated errors for sign-in and account creation",
+    "status": "resolved",
+    "created_at": "2026-03-17T03:06:13Z",
+    "updated_at": "2026-03-17T16:35:00Z",
+    "resolved_at": "2026-03-17T04:09:53Z",
+    "impact": "minor"
+  },
+  {
+    "provider": "OpenAI",
+    "name": "Elevated Errors Affecting ChatGPT Free and Guest Plan Users",
+    "status": "resolved",
+    "created_at": "2026-03-17T02:58:01Z",
+    "updated_at": "2026-03-17T05:20:01Z",
+    "resolved_at": "2026-03-17T05:20:01Z",
+    "impact": "minor"
+  },
+  {
+    "provider": "Claude",
+    "name": "Elevated errors on Claude.ai",
+    "status": "resolved",
+    "created_at": "2026-03-18T15:16:38.231Z",
+    "updated_at": "2026-03-18T16:05:10.861Z",
+    "resolved_at": "2026-03-18T16:05:10.845Z",
+    "impact": "major"
+  },
+  {
+    "provider": "Claude",
+    "name": "Increased errors on Opus 4.6",
+    "status": "resolved",
+    "created_at": "2026-03-18T12:30:57.440Z",
+    "updated_at": "2026-03-18T13:58:17.031Z",
+    "resolved_at": "2026-03-18T13:58:17.014Z",
+    "impact": "major"
+  },
+  {
+    "provider": "Claude",
+    "name": "Elevated errors on Claude Opus 4.6",
+    "status": "resolved",
+    "created_at": "2026-03-18T06:41:27.098Z",
+    "updated_at": "2026-03-18T09:45:53.734Z",
+    "resolved_at": "2026-03-18T09:45:53.714Z",
+    "impact": "major"
+  },
+  {
+    "provider": "Claude",
+    "name": "Elevated errors on Claude Opus 4.6",
+    "status": "resolved",
+    "created_at": "2026-03-17T19:47:30.788Z",
+    "updated_at": "2026-03-18T00:25:50.941Z",
+    "resolved_at": "2026-03-18T00:25:50.924Z",
+    "impact": "major"
+  },
+  {
+    "provider": "Claude",
+    "name": "Elevated errors on Claude Sonnet 4.6",
+    "status": "resolved",
+    "created_at": "2026-03-17T14:07:53.904Z",
+    "updated_at": "2026-03-17T15:45:20.322Z",
+    "resolved_at": "2026-03-17T15:45:20.304Z",
+    "impact": "minor"
+  }
+]
