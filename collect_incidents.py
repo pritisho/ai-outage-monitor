@@ -1,57 +1,67 @@
 import requests
 import json
 import os
+from datetime import datetime
 
 PROVIDERS = {
     "OpenAI": "https://status.openai.com/api/v2/incidents.json",
     "Claude": "https://status.anthropic.com/api/v2/incidents.json"
 }
 
-def fetch_incidents(provider, url, limit=5):
-    incidents_list = []
+def calculate_downtime(start, end):
+    try:
+        start_time = datetime.fromisoformat(start.replace("Z", ""))
+        end_time = datetime.fromisoformat(end.replace("Z", "")) if end else datetime.utcnow()
+        downtime = (end_time - start_time).total_seconds() / 60
+        return round(downtime, 2)
+    except:
+        return 0
+
+def fetch_incidents(provider, url):
+    incidents = []
 
     try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        r = requests.get(url, timeout=10)
+        data = r.json()
 
-        for incident in data.get("incidents", [])[:limit]:
-            incidents_list.append({
+        for inc in data["incidents"][:5]:
+
+            downtime = calculate_downtime(
+                inc.get("created_at"),
+                inc.get("resolved_at")
+            )
+
+            incidents.append({
                 "provider": provider,
-                "name": incident.get("name", "Unknown incident"),
-                "status": incident.get("status", "unknown"),
-                "created_at": incident.get("created_at", ""),
-                "updated_at": incident.get("updated_at", ""),
-                "resolved_at": incident.get("resolved_at", ""),
-                "impact": incident.get("impact", "unknown")
+                "name": inc.get("name"),
+                "status": inc.get("status"),
+                "start_time": inc.get("created_at"),
+                "end_time": inc.get("resolved_at"),
+                "impact": inc.get("impact"),
+                "downtime_minutes": downtime
             })
 
     except Exception as e:
-        incidents_list.append({
+        incidents.append({
             "provider": provider,
-            "name": f"Could not fetch incidents: {str(e)}",
-            "status": "error",
-            "created_at": "",
-            "updated_at": "",
-            "resolved_at": "",
-            "impact": "unknown"
+            "name": str(e),
+            "status": "error"
         })
 
-    return incidents_list
+    return incidents
 
 def main():
-    all_incidents = []
+    all_data = []
 
     for provider, url in PROVIDERS.items():
-        incidents = fetch_incidents(provider, url, limit=5)
-        all_incidents.extend(incidents)
+        all_data.extend(fetch_incidents(provider, url))
 
     os.makedirs("history", exist_ok=True)
 
-    with open("history/outage_history.json", "w", encoding="utf-8") as f:
-        json.dump(all_incidents, f, indent=2)
+    with open("history/outage_history.json", "w") as f:
+        json.dump(all_data, f, indent=2)
 
-    print("Outage history updated successfully.")
+    print("Outage data updated")
 
 if __name__ == "__main__":
     main()
