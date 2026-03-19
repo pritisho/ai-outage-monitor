@@ -65,7 +65,6 @@ def fetch_incidents():
             for inc in data.get("incidents", [])[:5]:
 
                 updates = inc.get("incident_updates", [])
-
                 timestamps = []
 
                 for u in updates:
@@ -73,7 +72,6 @@ def fetch_incidents():
                     if ts:
                         timestamps.append(ts)
 
-                # fallback if updates missing
                 if not timestamps:
                     if inc.get("created_at"):
                         timestamps.append(inc.get("created_at"))
@@ -83,7 +81,6 @@ def fetch_incidents():
                 start = min(timestamps) if timestamps else None
                 end = max(timestamps) if timestamps else None
 
-                # downtime calculation
                 downtime = None
                 try:
                     if start and end:
@@ -125,7 +122,7 @@ def calculate_availability(status, incidents):
         return "100%"
     return f"{round(100 - len(incidents) * 0.5, 2)}%"
 
-# ------------------ LLM ------------------
+# ------------------ LLM (RESPONSES API) ------------------
 def generate_answer(question, status_data, incidents):
 
     prompt = f"""
@@ -136,7 +133,7 @@ Answer clearly:
 2. If yes → explain it
 3. If no → give last 2 outages
 4. Include impact and downtime
-5. Be precise
+5. Be precise and factual
 
 STATUS:
 {json.dumps(status_data, indent=2)}
@@ -149,12 +146,12 @@ QUESTION:
 """
 
     try:
-        response = client.chat.completions.create(
+        response = client.responses.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
+            input=prompt
         )
 
-        return response.choices[0].message.content
+        return response.output_text
 
     except Exception as e:
         return f"LLM Error: {str(e)}"
@@ -163,7 +160,7 @@ QUESTION:
 status_data = fetch_status()
 incident_data = fetch_incidents()
 
-# ------------------ UI STATUS ------------------
+# ------------------ UI ------------------
 col1, col2 = st.columns(2)
 
 for col, provider in zip([col1, col2], ["OpenAI", "Claude"]):
@@ -172,12 +169,12 @@ for col, provider in zip([col1, col2], ["OpenAI", "Claude"]):
         st.write("Status:", status_data[provider]["status"])
         st.metric("Latency (sec)", status_data[provider]["latency"])
 
-# ------------------ ALERT ------------------
+# Alerts
 for provider in ["OpenAI", "Claude"]:
     if "Operational" not in status_data[provider]["status"]:
         st.error(f"🚨 {provider} outage detected")
 
-# ------------------ AVAILABILITY ------------------
+# Availability
 st.header("Availability")
 
 c1, c2 = st.columns(2)
@@ -193,7 +190,7 @@ with c2:
     st.metric("Claude Availability",
               calculate_availability(status_data["Claude"]["status"], claude_incidents))
 
-# ------------------ OUTAGES ------------------
+# Outages
 st.header("Last 2 Outages")
 
 for provider in ["OpenAI", "Claude"]:
@@ -213,7 +210,7 @@ for provider in ["OpenAI", "Claude"]:
                 "Downtime": o["downtime_minutes"]
             })
 
-# ------------------ AI ------------------
+# AI
 st.header("Ask AI")
 
 question = st.text_input("Ask about outages")
