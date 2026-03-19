@@ -1,4 +1,5 @@
 import requests
+import time
 import os
 
 PROVIDERS = {
@@ -7,25 +8,26 @@ PROVIDERS = {
 }
 
 def check_status(url):
+    start = time.time()
     try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        return data["status"]["description"]
-    except Exception as e:
-        return f"Unknown ({str(e)})"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        status = data["status"]["description"]
+    except:
+        status = "Unknown"
+    latency = round(time.time() - start, 3)
+    return status, latency
 
-def save_status(provider, status):
+def save_status(provider, status, latency):
     os.makedirs("documents", exist_ok=True)
-    file_path = f"documents/{provider.lower()}_status.txt"
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(f"Current status: {status}")
+    with open(f"documents/{provider.lower()}_status.txt", "w") as f:
+        f.write(f"Status: {status}\nLatency: {latency}")
 
 def main():
     for provider, url in PROVIDERS.items():
-        status = check_status(url)
-        save_status(provider, status)
-        print(f"{provider} status updated: {status}")
+        status, latency = check_status(url)
+        save_status(provider, status, latency)
+        print(provider, status, latency)
 
 if __name__ == "__main__":
     main()
