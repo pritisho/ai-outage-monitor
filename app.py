@@ -1,15 +1,15 @@
 import streamlit as st
 import requests
-import json
 import os
+import json
 from datetime import datetime
 from openai import OpenAI
 
-# ---------- PAGE CONFIG ----------
+# ------------------ PAGE ------------------
 st.set_page_config(page_title="AI Outage Monitor", layout="wide")
 st.title("AI Reliability Dashboard")
 
-# ---------- OPENAI SETUP ----------
+# ------------------ OPENAI ------------------
 api_key = os.getenv("OPENAI_API_KEY")
 
 if not api_key:
@@ -18,7 +18,7 @@ if not api_key:
 
 client = OpenAI(api_key=api_key)
 
-# ---------- FETCH LIVE STATUS ----------
+# ------------------ STATUS ------------------
 def fetch_status():
     providers = {
         "OpenAI": "https://status.openai.com/api/v2/status.json",
@@ -48,7 +48,7 @@ def fetch_status():
 
     return results
 
-# ---------- FETCH LIVE INCIDENTS ----------
+# ------------------ INCIDENTS ------------------
 def fetch_incidents():
     providers = {
         "OpenAI": "https://status.openai.com/api/v2/incidents.json",
@@ -62,34 +62,42 @@ def fetch_incidents():
             r = requests.get(url, timeout=10)
             data = r.json()
 
-            for inc in data["incidents"][:5]:
+            for inc in data.get("incidents", [])[:5]:
 
                 updates = inc.get("incident_updates", [])
 
-                start = None
-                end = None
+                timestamps = []
 
-                if updates:
-                    start = updates[0].get("created_at")
+                for u in updates:
+                    ts = u.get("created_at")
+                    if ts:
+                        timestamps.append(ts)
 
-                    for u in updates:
-                        if u.get("status") == "resolved":
-                            end = u.get("created_at")
+                # fallback if updates missing
+                if not timestamps:
+                    if inc.get("created_at"):
+                        timestamps.append(inc.get("created_at"))
+                    if inc.get("resolved_at"):
+                        timestamps.append(inc.get("resolved_at"))
 
-                if not start:
-                    start = inc.get("created_at")
+                start = min(timestamps) if timestamps else None
+                end = max(timestamps) if timestamps else None
 
-                if not end:
-                    end = inc.get("resolved_at")
-
+                # downtime calculation
                 downtime = None
                 try:
                     if start and end:
-                        s = datetime.fromisoformat(start.replace("Z",""))
-                        e = datetime.fromisoformat(end.replace("Z",""))
-                        downtime = round((e - s).total_seconds() / 60, 2)
+                        s = datetime.fromisoformat(start.replace("Z", ""))
+                        e = datetime.fromisoformat(end.replace("Z", ""))
+
+                        diff = (e - s).total_seconds() / 60
+
+                        if diff > 1:
+                            downtime = round(diff, 2)
+                        else:
+                            downtime = "Very short / instant"
                 except:
-                    pass
+                    downtime = None
 
                 all_data.append({
                     "provider": provider,
@@ -109,7 +117,7 @@ def fetch_incidents():
 
     return all_data
 
-# ---------- AVAILABILITY ----------
+# ------------------ AVAILABILITY ------------------
 def calculate_availability(status, incidents):
     if "Operational" in status:
         return "100%"
@@ -117,25 +125,24 @@ def calculate_availability(status, incidents):
         return "100%"
     return f"{round(100 - len(incidents) * 0.5, 2)}%"
 
-# ---------- LLM ----------
-def generate_answer(question, status_text, incidents):
+# ------------------ LLM ------------------
+def generate_answer(question, status_data, incidents):
 
     prompt = f"""
 You are a Site Reliability Engineer.
 
 Answer clearly:
-
 1. Is there a current outage?
 2. If yes → explain it
 3. If no → give last 2 outages
 4. Include impact and downtime
-5. Be precise and factual
+5. Be precise
 
 STATUS:
-{status_text}
+{json.dumps(status_data, indent=2)}
 
 INCIDENTS:
-{incidents}
+{json.dumps(incidents, indent=2)}
 
 QUESTION:
 {question}
@@ -146,15 +153,17 @@ QUESTION:
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}]
         )
+
         return response.choices[0].message.content
+
     except Exception as e:
         return f"LLM Error: {str(e)}"
 
-# ---------- LOAD DATA ----------
+# ------------------ LOAD DATA ------------------
 status_data = fetch_status()
 incident_data = fetch_incidents()
 
-# ---------- DISPLAY STATUS ----------
+# ------------------ UI STATUS ------------------
 col1, col2 = st.columns(2)
 
 for col, provider in zip([col1, col2], ["OpenAI", "Claude"]):
@@ -163,12 +172,12 @@ for col, provider in zip([col1, col2], ["OpenAI", "Claude"]):
         st.write("Status:", status_data[provider]["status"])
         st.metric("Latency (sec)", status_data[provider]["latency"])
 
-# ---------- ALERTS ----------
+# ------------------ ALERT ------------------
 for provider in ["OpenAI", "Claude"]:
     if "Operational" not in status_data[provider]["status"]:
-        st.error(f"🚨 {provider} Outage Detected")
+        st.error(f"🚨 {provider} outage detected")
 
-# ---------- AVAILABILITY ----------
+# ------------------ AVAILABILITY ------------------
 st.header("Availability")
 
 c1, c2 = st.columns(2)
@@ -184,7 +193,7 @@ with c2:
     st.metric("Claude Availability",
               calculate_availability(status_data["Claude"]["status"], claude_incidents))
 
-# ---------- OUTAGE DETAILS ----------
+# ------------------ OUTAGES ------------------
 st.header("Last 2 Outages")
 
 for provider in ["OpenAI", "Claude"]:
@@ -201,18 +210,15 @@ for provider in ["OpenAI", "Claude"]:
                 "Impact": o["impact"],
                 "Start Time": o["start_time"],
                 "End Time": o["end_time"],
-                "Downtime (minutes)": o["downtime_minutes"]
+                "Downtime": o["downtime_minutes"]
             })
 
-# ---------- AI Q&A ----------
+# ------------------ AI ------------------
 st.header("Ask AI")
 
 question = st.text_input("Ask about outages")
 
 if question:
-    combined_status = json.dumps(status_data, indent=2)
-
-    answer = generate_answer(question, combined_status, incident_data)
-
+    answer = generate_answer(question, status_data, incident_data)
     st.subheader("AI Answer")
     st.write(answer)
