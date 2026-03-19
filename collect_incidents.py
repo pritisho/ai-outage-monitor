@@ -8,14 +8,44 @@ PROVIDERS = {
     "Claude": "https://status.anthropic.com/api/v2/incidents.json"
 }
 
+def calculate_times(incident):
+
+    updates = incident.get("incident_updates", [])
+
+    start_time = None
+    end_time = None
+
+    if updates:
+        # First update = start
+        start_time = updates[0].get("created_at")
+
+        # Find resolved update
+        for u in updates:
+            if u.get("status") == "resolved":
+                end_time = u.get("created_at")
+
+    # Fallback if missing
+    if not start_time:
+        start_time = incident.get("created_at")
+
+    if not end_time:
+        end_time = incident.get("resolved_at")
+
+    return start_time, end_time
+
+
 def calculate_downtime(start, end):
     try:
-        start_time = datetime.fromisoformat(start.replace("Z", ""))
-        end_time = datetime.fromisoformat(end.replace("Z", "")) if end else datetime.utcnow()
-        downtime = (end_time - start_time).total_seconds() / 60
-        return round(downtime, 2)
+        if not start or not end:
+            return None
+
+        s = datetime.fromisoformat(start.replace("Z", ""))
+        e = datetime.fromisoformat(end.replace("Z", ""))
+
+        return round((e - s).total_seconds() / 60, 2)
     except:
-        return 0
+        return None
+
 
 def fetch_incidents(provider, url):
     incidents = []
@@ -26,18 +56,15 @@ def fetch_incidents(provider, url):
 
         for inc in data["incidents"][:5]:
 
-            downtime = calculate_downtime(
-                inc.get("created_at"),
-                inc.get("resolved_at")
-            )
+            start, end = calculate_times(inc)
+            downtime = calculate_downtime(start, end)
 
             incidents.append({
                 "provider": provider,
                 "name": inc.get("name"),
-                "status": inc.get("status"),
-                "start_time": inc.get("created_at"),
-                "end_time": inc.get("resolved_at"),
                 "impact": inc.get("impact"),
+                "start_time": start,
+                "end_time": end,
                 "downtime_minutes": downtime
             })
 
@@ -45,10 +72,11 @@ def fetch_incidents(provider, url):
         incidents.append({
             "provider": provider,
             "name": str(e),
-            "status": "error"
+            "impact": "error"
         })
 
     return incidents
+
 
 def main():
     all_data = []
@@ -61,7 +89,8 @@ def main():
     with open("history/outage_history.json", "w") as f:
         json.dump(all_data, f, indent=2)
 
-    print("Outage data updated")
+    print("Outage data updated successfully")
+
 
 if __name__ == "__main__":
     main()
