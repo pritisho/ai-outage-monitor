@@ -1,48 +1,28 @@
 import json
-import pandas as pd
 
-HISTORY_FILE = "history/outage_history.json"
-
-def load_history():
+def load_data():
     try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return pd.DataFrame(data)
-    except Exception:
-        return pd.DataFrame()
+        with open("history/outage_history.json") as f:
+            return json.load(f)
+    except:
+        return []
 
-def get_provider_outages(provider):
-    df = load_history()
-    if df.empty:
-        return pd.DataFrame()
+def get_outages(provider):
+    data = load_data()
+    return [x for x in data if x["provider"] == provider]
 
-    filtered = df[df["provider"] == provider].copy()
+def get_last_two(provider):
+    return get_outages(provider)[:2]
 
-    if "created_at" in filtered.columns:
-        filtered = filtered.sort_values(by="created_at", ascending=False)
+def availability(status_text, incidents):
 
-    return filtered
-
-def get_last_n_outages(provider, n=5):
-    df = get_provider_outages(provider)
-    return df.head(n)
-
-def get_incident_count(provider):
-    df = get_provider_outages(provider)
-    return len(df)
-
-def get_availability_score(provider):
-    df = get_provider_outages(provider)
-
-    if len(df) == 0:
+    if "Operational" in status_text:
         return "100%"
 
-    count = len(df)
+    # fallback calculation
+    count = len(incidents)
 
-    if count == 1:
-        return "99.9%"
-    if count <= 3:
-        return "99.5%"
-    if count <= 5:
-        return "99.0%"
-    return "98.0%"
+    if count == 0:
+        return "100%"
+
+    return f"{round(100 - count * 0.5,2)}%"
