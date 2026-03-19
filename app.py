@@ -1,55 +1,91 @@
 import streamlit as st
-import os
-from outage_logic import get_last_n_outages, get_incident_count, get_availability_score
+import json
+from outage_logic import get_last_two, get_outages, availability
+from llm_engine import generate_answer
 
 st.set_page_config(page_title="AI Outage Monitor", layout="wide")
 
-st.title("AI Provider Reliability Dashboard")
-st.write("Monitor current status, recent outages, and availability metrics for OpenAI and Claude.")
+st.title("AI Reliability Dashboard")
 
-providers = ["OpenAI", "Claude"]
+def read_status(provider):
+    try:
+        with open(f"documents/{provider.lower()}_status.txt") as f:
+            return f.read()
+    except:
+        return "Unknown"
 
-st.header("Current Provider Status")
+openai_status = read_status("OpenAI")
+claude_status = read_status("Claude")
 
+# STATUS DISPLAY
 col1, col2 = st.columns(2)
 
-for i, provider in enumerate(providers):
-    file_path = f"documents/{provider.lower()}_status.txt"
+with col1:
+    st.subheader("OpenAI")
+    st.text(openai_status)
 
-    if os.path.exists(file_path):
-        with open(file_path, "r", encoding="utf-8") as f:
-            status_text = f.read()
-    else:
-        status_text = "Current status: Unknown"
+with col2:
+    st.subheader("Claude")
+    st.text(claude_status)
 
-    with (col1 if i == 0 else col2):
-        st.subheader(provider)
-        if "Operational" in status_text:
-            st.success(status_text)
-        elif "Unknown" in status_text:
-            st.warning(status_text)
-        else:
-            st.error(status_text)
+# LOAD INCIDENT DATA
+with open("history/outage_history.json") as f:
+    data = json.load(f)
 
-st.header("Availability Metrics")
+openai_incidents = get_outages("OpenAI")
+claude_incidents = get_outages("Claude")
 
-metric_col1, metric_col2 = st.columns(2)
+# ALERTS
+if "Operational" not in openai_status:
+    st.error("🚨 OpenAI Outage Detected")
 
-with metric_col1:
-    st.metric("OpenAI Incident Count", get_incident_count("OpenAI"))
-    st.metric("OpenAI Availability Score", get_availability_score("OpenAI"))
+if "Operational" not in claude_status:
+    st.error("🚨 Claude Outage Detected")
 
-with metric_col2:
-    st.metric("Claude Incident Count", get_incident_count("Claude"))
-    st.metric("Claude Availability Score", get_availability_score("Claude"))
+# METRICS
+st.header("Availability")
 
-st.header("Last 5 Outages")
+c1, c2 = st.columns(2)
 
-for provider in providers:
+with c1:
+    st.metric("OpenAI Availability", availability(openai_status, openai_incidents))
+
+with c2:
+    st.metric("Claude Availability", availability(claude_status, claude_incidents))
+
+# OUTAGE DETAILS
+st.header("Last 2 Outages")
+
+for provider in ["OpenAI", "Claude"]:
+
     st.subheader(provider)
-    outages = get_last_n_outages(provider, 5)
 
-    if outages.empty:
-        st.info(f"No outage history available for {provider}.")
-    else:
-        st.dataframe(outages, use_container_width=True)
+    outages = get_last_two(provider)
+
+    for o in outages:
+        st.write({
+            "Name": o["name"],
+            "Impact": o.get("impact"),
+            "Start": o.get("start_time"),
+            "End": o.get("end_time"),
+            "Downtime (min)": o.get("downtime_minutes")
+        })
+
+# AI QUESTION
+st.header("Ask AI")
+
+question = st.text_input("Ask about outages")
+
+if question:
+    combined = f"""
+OpenAI:
+{openai_status}
+
+Claude:
+{claude_status}
+"""
+
+    answer = generate_answer(question, combined, data)
+
+    st.subheader("Answer")
+    st.write(answer)
